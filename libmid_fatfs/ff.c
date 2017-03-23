@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include <errno.h>
+#include <string.h>
 
 fr_t f_open(FIL *fil, const char *path, uint32_t flags)
 {
