@@ -224,6 +224,35 @@ int main(int argc, const char *argv[])
     }
     fprintf(stderr, "Got chip_id (%x)\n", chip_id);
 
+    uint32_t crc;
+    if (bootloader_get_crc(&crc) == -1) {
+    	fprintf(stderr, "Failed to get crc\n");
+    	abort();
+    }
+    fprintf(stderr, "Got crc (%x)\n", crc);
+
+    uint32_t sn[3];
+    if (bootloader_get_sn(&sn) == -1) {
+    	fprintf(stderr, "Failed to get sn\n");
+    	abort();
+    }
+    fprintf(stderr, "Got sn (%08x %08x %08x)\n", sn[0], sn[1], sn[2]);
+
+    #define otpsize 512
+    uint8_t otp[otpsize];
+    if (bootloader_get_otp(&otp) == -1) {
+    	fprintf(stderr, "Failed to get otp\n");
+    	abort();
+    }
+    fprintf(stderr, "Got otp\n");
+    for (uint16_t i=0; i<otpsize; i++) {
+	if (i % 32 == 0) {
+	    fprintf(stderr, "\n");
+	}
+	fprintf(stderr,"%02x", otp[i]);
+    }
+    fprintf(stderr, "\n");
+
     const char chip_des[65537];
     memset(chip_des, '\0', sizeof(chip_des));
     if (bootloader_get_chip_des(&chip_des, sizeof(chip_des)) == -1) {
@@ -236,6 +265,12 @@ int main(int argc, const char *argv[])
 	fprintf(stderr, "Failed to get sync\n");
     } else {
 	fprintf(stderr, "Got sync\n");
+    }
+
+    if (bootloader_boot() == -1) {
+	fprintf(stderr, "Failed to boot\n");
+    } else {
+	fprintf(stderr, "Got boot\n");
     }
 
     fprintf(stderr, "test-bootloader: All done\n");
