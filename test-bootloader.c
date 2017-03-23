@@ -182,11 +182,47 @@ int main(int argc, const char *argv[])
     }
     fprintf(stderr, "Got rev (%u)\n", rev);
 
+    uint32_t board_id;
+    if (bootloader_get_board_id(&board_id) == -1) {
+    	fprintf(stderr, "Failed to get board_id\n");
+    	abort();
+    }
+    fprintf(stderr, "Got board_id (%u)\n", board_id);
+
+    uint32_t board_rev;
+    if (bootloader_get_board_rev(&board_rev) == -1) {
+    	fprintf(stderr, "Failed to get board_rev\n");
+    	abort();
+    }
+    fprintf(stderr, "Got board_rev (%u)\n", board_rev);
+
+    uint32_t fw_size;
+    if (bootloader_get_fw_size(&fw_size) == -1) {
+    	fprintf(stderr, "Failed to get fw_size\n");
+    	abort();
+    }
+    fprintf(stderr, "Got fw_size (%u)\n", fw_size);
+
+    uint32_t vecs[4];
+    if (bootloader_get_vec_area(vecs) == -1) {
+    	fprintf(stderr, "Failed to get vec_area\n");
+    	abort();
+    }
+    fprintf(stderr, "Got vec_area (%x) (%x) (%x) (%x)\n", vecs[0],vecs[1],vecs[2],vecs[3]);
+
+
     if (bootloader_send_nop(&rev) == -1) {
     	fprintf(stderr, "Failed to do nop\n");
     	abort();
     }
     fprintf(stderr, "NOP done\n");
+
+    uint32_t chip_id;
+    if (bootloader_get_chip_id(&chip_id) == -1) {
+    	fprintf(stderr, "Failed to get chip_id\n");
+    	abort();
+    }
+    fprintf(stderr, "Got chip_id (%x)\n", chip_id);
 
     const char chip_des[65537];
     memset(chip_des, '\0', sizeof(chip_des));
