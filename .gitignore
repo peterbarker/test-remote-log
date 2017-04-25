@@ -7,3 +7,7 @@ mavlink_remote_log.h
 test
 bootloader_client.c
 bootloader_client.h
+ublox.c
+ublox.h
+test-ublox
+ports.h
