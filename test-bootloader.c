@@ -10,6 +10,8 @@
 #include <string.h>
 #include <termios.h>
 #include <ctype.h>
+#include <stdarg.h>
+
 
 #include "bootloader_client.h"
 
@@ -33,76 +35,71 @@ uint64_t now_ms()
     return (spec.tv_sec * 1000 + spec.tv_nsec/1000000);
 }
 
-void uart2_write(char *buf, const uint32_t count, const ssize_t tickstowait)
+ssize_t bootloader_write(const uint8_t *bytes, const size_t bytecount, const bl_timeout_t tickstowait)
 {
-    fprintf(stderr, "uartt2_write (%u bytes)\n", count);
+    fprintf(stderr, "uartt2_write (%lu bytes)\n", bytecount);
     const uint64_t ms_to_wait = tickstowait/10;
     const uint64_t start_time_ms = now_ms();
 
     ssize_t total_written = 0;
-    while (total_written < count) {
+    while (total_written < bytecount) {
         const uint32_t delta = now_ms() - start_time_ms;
         if (delta > ms_to_wait) {
-            fprintf(stderr, "write timeout after %ums (now=%u start=%u delta=%u)\n", ms_to_wait, now_ms(), start_time_ms, delta);
-            abort();
+            fprintf(stderr, "write timeout after %lums (now=%lu start=%lu delta=%u)\n", ms_to_wait, now_ms(), start_time_ms, delta);
+            return -1;
         }
-        int thistime = write(serial_fd, buf, count);
+        int thistime = write(serial_fd, &bytes[total_written], bytecount);
         if (thistime == -1) {
             if (errno == EAGAIN) {
-                fprintf(stderr, "write failed: %s\n", strerror(errno));
                 continue;
             }
-            fprintf(stderr, "write failed: %s\n", strerror(errno));
-            exit(1);
+            /* fprintf(stderr, "write failed: %s\n", strerror(errno)); */
+            continue;
         }
-        if (thistime < count) {
-            fprintf(stderr, "short write (%u < %u)\n", thistime, count);
+        if (thistime < bytecount) {
+            fprintf(stderr, "short write (%d < %lu)\n", thistime, bytecount);
         }
         total_written += thistime;
     }
-    fprintf(stderr, "total written: %u\n", total_written);
-    return;
+    fsync(serial_fd);
+    fprintf(stderr, "total written: %lu\n", total_written);
+    return total_written;
 }
 
-int uart2_readbyte(uint8_t *b, const ssize_t timeout)
+ssize_t bootloader_readbyte(uint8_t *byte, const bl_timeout_t timeout)
 {
-    if (!xQueueReceive(NULL, b, timeout)) {
-	return 0;
-    }
-    return 1;
-}
-
-
-
-void XQueueReset(QueueHandle_t queue)
-{
-    tcflush(serial_fd, TCIFLUSH);
-}
-
-int xQueueReceive(QueueHandle_t queue, char *dest, uint32_t tickstowait)
-{
-    const uint64_t ms_to_wait = tickstowait/10;
+    const uint64_t ms_to_wait = timeout/10;
 
     const uint64_t start_time_ms = now_ms();
    /* fprintf(stderr, "xQueueReceive\n"); */
     while (1) {
-	int bytes_read = read(serial_fd, dest, 1);
+	int bytes_read = read(serial_fd, byte, 1);
 	if (bytes_read == -1) {
-	    fprintf(stderr, "read failed\n");
-	    abort();
+            if (errno == EAGAIN) {
+                continue;
+            }
+	    fprintf(stderr, "read failed: %m\n");
+	    exit(1);
 	}
 	if (bytes_read == 1) {
-            fprintf(stderr, "got a byte (0x%02x) (%c)\n", dest[0], (isprint(dest[0]) ? dest[0] : ' '));
+            fprintf(stderr, "got a byte (0x%02x) (%c)\n", byte[0], (isprint(byte[0]) ? byte[0] : ' '));
             return 1; /* success */
         }
         const uint32_t delta = now_ms() - start_time_ms;
         if (delta > ms_to_wait) {
-            fprintf(stderr, "read timeout after %ums (now=%u start=%u delta=%u)\n", ms_to_wait, now_ms(), start_time_ms, delta);
+            fprintf(stderr, "read timeout after %lums (now=%lu start=%lu delta=%u)\n", ms_to_wait, now_ms(), start_time_ms, delta);
             return 0;
         }
     }
 }
 
+void bootloader_debug(const char  *format, ...)
+{
+    va_list argptr;
+    va_start(argptr,format);
+    vfprintf(stderr, format, argptr);
+    va_end(argptr);
+}
 
 /*
  * slurp_file - read a file into memory
@@ -187,7 +184,18 @@ int configure_serial(int serial_fd)
             cfsetospeed(&options, config.baud);
             if (tcsetattr(serial_fd, TCSANOW, &options) == -1) {
                 fprintf(stderr, "Failed to set serial options: %m\n");
-                exit(1);
+                /* exit(1); */
+            }
+
+            tcflush(serial_fd, TCIFLUSH);
+            tcflush(serial_fd, TCOFLUSH);
+
+            // try syncing before we do a mavlink reset (which can confuse bl)
+            if (bootloader_get_sync() == -1) {
+                fprintf(stderr, "Failed to get sync\n");
+            } else {
+                fprintf(stderr, "Got sync\n");
+                return 0;
             }
 
             bootloader_send_mavlink_reboot();
@@ -195,6 +203,13 @@ int configure_serial(int serial_fd)
 
             tcflush(serial_fd, TCIFLUSH);
             tcflush(serial_fd, TCOFLUSH);
+
+            if (bootloader_get_sync() == -1) {
+                fprintf(stderr, "Failed to get sync\n");
+            } else {
+                fprintf(stderr, "Got sync\n");
+                return 0;
+            }
 
             char c;
             while (read(serial_fd, &c, 1) == 1) {
@@ -213,7 +228,7 @@ int configure_serial(int serial_fd)
 
 void bootloader_progress(uint8_t percent)
 {
-    fprintf(stderr, "%u percent\n");
+    fprintf(stderr, "%u percent\n", percent);
 }
 
 int main(int argc, const char *argv[])
@@ -251,13 +266,20 @@ int main(int argc, const char *argv[])
 	fprintf(stderr, "Got sync\n");
     }
 
+    /* if (bootloader_set_boot_delay(5) == -1) { */
+    /*     fprintf(stderr, "Failed to set delay\n"); */
+    /* } else { */
+    /*     fprintf(stderr, "Set delay\n"); */
+    /* } */
+
+    /* exit(0); */
+
     if (bootloader_get_crc(&crc) == -1) {
     	fprintf(stderr, "Failed to get crc\n");
     } else {
         fprintf(stderr, "Got crc (%x)\n", crc);
     }
 
-    /* XQueueReset(); */
     if (bootloader_get_sync() == -1) {
 	fprintf(stderr, "Failed to get sync\n");
     } else {
@@ -284,7 +306,7 @@ int main(int argc, const char *argv[])
     	fprintf(stderr, "Failed to get rev\n");
     	abort();
     }
-    fprintf(stderr, "Got rev (%u)\n", rev);
+    fprintf(stderr, "Bootloader revision (%u)\n", rev);
 
     uint32_t board_id;
     if (bootloader_get_board_id(&board_id) == -1) {
@@ -382,7 +404,7 @@ int main(int argc, const char *argv[])
     }
 
     /* erase the chip */
-    fprintf(stderr, "Erasing (~10 seconds)\n", crc);
+    fprintf(stderr, "Erasing (~10 seconds)\n");
     int erase_done = 0;
     bootloader_erase_send();
     for (uint8_t i=0; i<15; i++) {
@@ -403,7 +425,7 @@ int main(int argc, const char *argv[])
         exit(1);
     }
 
-    fprintf(stderr, "Programming (~10 seconds)\n", crc);
+    fprintf(stderr, "Programming (~10 seconds)\n");
     if (bootloader_program(fw, fw_len, bootloader_progress) == -1) {
         fprintf(stderr, "program failed\n");
     }

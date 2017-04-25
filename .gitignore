@@ -5,4 +5,5 @@ mavlink.h
 mavlink_remote_log.c
 mavlink_remote_log.h
 test
-
+bootloader_client.c
+bootloader_client.h

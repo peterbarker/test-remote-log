@@ -10,9 +10,11 @@ test:
 
 
 test-bootloader:
-	cp ${BASE}/bootloader_client.h .
-	cp ${BASE}/bootloader_client.c .
-	gcc -I ${INCLUDE} -O0 -g -I. test-bootloader.c bootloader_client.c libmid_fatfs/ff.c queue.c -o test-bootloader
+	cp -f ${BASE}/bootloader_client.h .
+	chmod -w bootloader_client.h
+	cp -f ${BASE}/bootloader_client.c .
+	chmod -w bootloader_client.c
+	gcc -I ${INCLUDE} -O0 -g -I. bootloader_client.c test-bootloader.c  libmid_fatfs/ff.c queue.c -o test-bootloader
 
 clean:
 	rm -f *.o test-bootloader test
