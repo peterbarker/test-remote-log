@@ -1,5 +1,5 @@
 SONIX_FIRMWARE=/home/pbarker/rc/skyrocket/sonix_firmware
-BASE=${SONIX_FIRMWARE}/app/dashcam/src/main_flow/daemon
+BASE=${SONIX_FIRMWARE}/snx_sdk/app/dashcam/src/main_flow/daemon
 INCLUDE=${SONIX_FIRMWARE}/buildscript/include
 
 test:
