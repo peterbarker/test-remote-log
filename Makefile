@@ -14,7 +14,7 @@ test-bootloader:
 	chmod -w bootloader_client.h
 	cp -f ${BASE}/bootloader_client.c .
 	chmod -w bootloader_client.c
-	gcc -I ${INCLUDE} -O0 -g -I. bootloader_client.c test-bootloader.c  libmid_fatfs/ff.c queue.c -o test-bootloader
+	gcc -I ${INCLUDE} -O0 -g -I. slurp.c bootloader_client.c test-bootloader.c  libmid_fatfs/ff.c queue.c -o test-bootloader
 
 clean:
 	rm -f *.o test-bootloader test
