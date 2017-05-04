@@ -27,3 +27,5 @@ fr_t f_write(FIL *fil, char *buf, const uint32_t buflen, uint32_t *bytes_written
 fr_t f_lseek(FIL *fil, uint32_t offset);
 
 fr_t f_close(FIL *fil);
+
+uint8_t exists(const char *path);

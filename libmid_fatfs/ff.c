@@ -19,6 +19,7 @@ fr_t f_open(FIL *fil, const char *path, uint32_t flags)
     if (flags & FA_WRITE) {
 	open_flags |= O_WRONLY;
     }
+    open_flags |= O_TRUNC; // TODO: work out if this is actually implied!
 
     fprintf(stderr, "opening: %s\n", path);
     int ret = open(path, open_flags, 0777);
@@ -75,4 +76,13 @@ fr_t f_close(FIL *fil)
     fil->fd = -1;
     fil->fs = 0;
     return FR_OK;
+}
+
+uint8_t exists(const char *path)
+{
+    struct stat notused;
+    if (stat(path, &notused) == -1) {
+        return 0;
+    }
+    return 1;
 }
