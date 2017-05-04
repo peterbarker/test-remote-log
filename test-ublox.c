@@ -44,10 +44,17 @@ int mygetchar(void *state)
     return fw[pos++];
 }
 
-int msghandler(const uint8_t *msg, const uint32_t msglen)
+/* void msghandler(void *state, const char *msg, uint32_t msglen); */
+
+
+/* void msghandler(const uint8_t *msg, const uint32_t msglen) */
+/* { */
+/*     fprintf(stderr, "msghandler called\n"); */
+/* } */
+
+void time_msghandler(void *state, ublox_class_t class_id, ublox_msg_t msg_id, const uint8_t *msg, const uint32_t msglen)
 {
-    fprintf(stderr, "msghandler called\n");
-    return 0;
+    fprintf(stderr, "msghandler called class_id=(0x%02x) msg_id=(0x%02x)\n", class_id, msg_id);
 }
 
 int main(int argc, const char *argv[])
@@ -63,12 +70,30 @@ int main(int argc, const char *argv[])
 	exit(1);
     }
 
-    ublox_parser(mygetchar, NULL, msghandler);
+//    ublox_parser(mygetchar, NULL, msghandler);
+    handle_ublox_data(fw, fw_len);
+
+    time_t now = time(NULL);
+    uint8_t ubx[UBLOX_MAX_MESSAGE_SIZE];
+    uint16_t len = ublox_make_ubx_mga_ini_time_utc(&ubx, now);
+    fprintf(stderr, "got packet of size (%u)\n", len);
+    fw = ubx; // global variable pointing to a stack variable.  WCPGW?
+    fw_len = len;
+    pos = 0;
+    ublox_parser(mygetchar, NULL, time_msghandler);
 
     exit(0);
 }
 
 void ublox_debug(const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vprintf(format, ap);
+    va_end(ap);
+}
+
+void console_printf(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
